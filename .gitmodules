@@ -1,0 +1,3 @@
+[submodule "src/dylithium_py"]
+	path = src/dylithium_py
+	url = https://github.com/giacomopope/dilithium-py
