@@ -3,7 +3,7 @@ import pickle
 from common import * 
 import uuid
 from datetime import datetime, timedelta
-
+from dylithium_py.src.dilithium_py.dilithium import Dilithium5
 
 class Certificate:
     version_no = None
@@ -44,3 +44,17 @@ class DigitalCertificate:
         self.certificate_algorithm = "SHA+RSA"
 
     
+class PQ_DigitalCertificate:
+    certificate_body = None
+    certificate_signature = None
+    certificate_algorithm = None
+    
+    def __init__(self,body, ) -> None:
+        self.certificate_body=body
+        data = pickle.dumps(body)
+        hash = hashlib.sha256(data).digest()
+        val_bytes = bytearray(hash)
+        temp = ''.join(['%02x' % byte for byte in val_bytes])
+        self.certificate_algorithm = Dilithium5.sign(SERVER_DILITHIUM_PRIVATE_KEY, str.encode(temp))
+        self.certificate_algorithm = "DILITHIUM"
+ 

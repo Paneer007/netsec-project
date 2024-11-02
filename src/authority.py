@@ -22,13 +22,24 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
             certificate_bob = Certificate("BOB",USER_PUBLIC_KEY.export_key())
             ds = DigitalCertificate(certificate_bob)
             ds_dict["BOB"] = ds
-            socket.sendto(b"done", self.client_address)
-            
+            socket.sendto(pickle.dumps(ds), self.client_address)
         elif b"create_certificate_alice" in data:
             USER_PUBLIC_KEY =  RSA.import_key(data[25:])
             certificate_alice = Certificate("ALICE",USER_PUBLIC_KEY.export_key())
             ds = DigitalCertificate(certificate_alice)
             ds_dict["ALICE"] = ds
+            socket.sendto(pickle.dumps(ds), self.client_address)
+        elif b"create_pq_certificate_alice" in data:
+            USER_PUBLIC_KEY =  RSA.import_key(data[25+3:])
+            certificate_alice = Certificate("ALICE",USER_PUBLIC_KEY.export_key())
+            ds = PQ_DigitalCertificate(certificate_alice)
+            ds_dict["ALICE"] = ds
+            socket.sendto(b"done", self.client_address)
+        elif b"create_pq_certificate_bob" in data:
+            USER_PUBLIC_KEY =  RSA.import_key(data[23:])
+            certificate_bob = Certificate("BOB",USER_PUBLIC_KEY.export_key())
+            ds = PQ_DigitalCertificate(certificate_bob)
+            ds_dict["BOB"] = ds
             socket.sendto(b"done", self.client_address)
         elif b"get_certificate_alice" in data:
             socket.sendto(pickle.dumps(ds_dict["ALICE"]),self.client_address)

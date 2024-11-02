@@ -26,17 +26,30 @@ ALICE_DECIPHER_RSA = PKCS1_OAEP.new(ALICE_PRIVATE_KEY)
 BOB_PUBLIC_KEY = None
 BOB_CIPHER_RSA = None 
 
+BOB_DIGITAL_CERTIFICATE = None
+ALICE_DIGITAL_CERTIFICATE = None
 
 class MyUDPHandler(socketserver.BaseRequestHandler):
+
     def handle(self):
+        global BOB_DIGITAL_CERTIFICATE
+        global ALICE_DIGITAL_CERTIFICATE
         encrypted_data = self.request[0].strip()
-        data = ALICE_DECIPHER_RSA.decrypt(encrypted_data)
-        # data = encrypted_data
         socket = self.request[1]
-        print("{} wrote:".format(self.client_address[0]))
-        usr_data = input("> ")
-        data = BOB_CIPHER_RSA.encrypt(usr_data.encode())
-        socket.sendto(data,self.client_address)
+        if b"get_certificate_from_alice " in encrypted_data:
+            # print("{} wrote: {}".format(self.client_address[0], encrypted_data))
+            len_data = len("get_certificate_from_alice ")
+            data = encrypted_data[len_data:]
+            BOB_DIGITAL_CERTIFICATE = pickle.loads(data)
+            temp_a_cert = pickle.dumps(ALICE_DIGITAL_CERTIFICATE)
+            socket.sendto(temp_a_cert, self.client_address)
+        else:
+            data = ALICE_DECIPHER_RSA.decrypt(encrypted_data)
+            # data = encrypted_data
+            print("{} wrote: {}".format(self.client_address[0], data))
+            usr_data = input("> ")
+            data = BOB_CIPHER_RSA.encrypt(usr_data.encode())
+            socket.sendto(data,self.client_address)
 
 def recvall(sock):
     BUFF_SIZE = 4096 # 4 KiB
@@ -94,12 +107,14 @@ def cli_loop():
             print("Enter Valid Input")
 
 def create_certificate():
+    global ALICE_DIGITAL_CERTIFICATE
     message = b"create_certificate_alice " + ALICE_PUBLIC_KEY.export_key("OpenSSH")
     data = SERVER_CIPHER_RSA.encrypt(message)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.connect((HOST, PORT))
         sock.sendall(data)
-        received = str(sock.recv(1024), "utf-8")
+        received = recvall(sock)
+        ALICE_DIGITAL_CERTIFICATE = pickle.loads(received)
 
 
 def cli():

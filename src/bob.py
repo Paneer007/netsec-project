@@ -6,10 +6,8 @@ import hashlib
 import pickle
 import sys
 
-
 HOST, PORT = "localhost", 9998
 ALICE_PORT =  9995
-
 
 BOB_PUBLIC_KEY = None
 BOB_PRIVATE_KEY = None
@@ -26,6 +24,8 @@ BOB_DECIPHER_RSA = PKCS1_OAEP.new(BOB_PRIVATE_KEY)
 ALICE_PUBLIC_KEY = None
 ALICE_CIPHER_RSA = None 
 
+BOB_DIGITAL_CERTIFICATE = None
+ALICE_DIGITAL_CERTIFICATE = None
 
 def recvall(sock):
     BUFF_SIZE = 4096 # 4 KiB
@@ -60,14 +60,27 @@ def get_alice_public_key():
             exit(0)
         return RSA.import_key(ds.certificate_body.subject_public_key)
 
+def get_alice_public_key_from_alice(sock):
+    data = b"get_certificate_from_alice " + pickle.dumps(BOB_DIGITAL_CERTIFICATE) 
+    sock.sendall(data)
+    received = recvall(sock)
+    ds = pickle.loads(received)
+    if not check_valid_certificate(ds):
+        print("Invalid Certificate !!!")
+        exit(0)
+    return RSA.import_key(ds.certificate_body.subject_public_key)
+
+
 def send_message():
     global ALICE_PUBLIC_KEY
     global ALICE_CIPHER_RSA
-    ALICE_PUBLIC_KEY = get_alice_public_key()
-    ALICE_CIPHER_RSA = PKCS1_OAEP.new(ALICE_PUBLIC_KEY)
+    # ALICE_PUBLIC_KEY = get_alice_public_key()
+    # ALICE_CIPHER_RSA = PKCS1_OAEP.new(ALICE_PUBLIC_KEY)
     i = 0
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.connect((HOST, ALICE_PORT))
+        ALICE_PUBLIC_KEY = get_alice_public_key_from_alice(s)
+        ALICE_CIPHER_RSA = PKCS1_OAEP.new(ALICE_PUBLIC_KEY)
         while i<10:
             usr_data = input("> ")
             data = ALICE_CIPHER_RSA.encrypt(usr_data.encode())
@@ -91,15 +104,14 @@ def cli_loop():
             print("Enter Valid Input")
 
 def create_certificate():
+    global BOB_DIGITAL_CERTIFICATE
     message = b"create_certificate_bob " + BOB_PUBLIC_KEY.export_key("OpenSSH")
     data = SERVER_CIPHER_RSA.encrypt(message)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.connect((HOST, PORT))
         sock.sendall(data)
-        received = str(sock.recv(1024), "utf-8")
-    
-    
-
+        received = recvall(sock)
+        BOB_DIGITAL_CERTIFICATE = pickle.loads(received)
 
 def cli():
     print("Bob logged in")
