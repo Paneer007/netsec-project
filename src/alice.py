@@ -6,7 +6,7 @@ import hashlib
 import pickle
 import socketserver
 import sys
-
+from dylithium_py.src.dilithium_py.dilithium import Dilithium5
 
 HOST, PORT = "localhost", 9998
 ALICE_PORT = 9995
@@ -29,20 +29,39 @@ BOB_CIPHER_RSA = None
 BOB_DIGITAL_CERTIFICATE = None
 ALICE_DIGITAL_CERTIFICATE = None
 
+PQ_FLAG = True
+
+def send_large_data(data, sock,address, chunk_size=4096):
+    # Split data into chunks
+    for i in range(0, len(data), chunk_size):
+        chunk = data[i:i + chunk_size]
+        sock.sendto(chunk, address)
+    # Send an empty chunk to indicate the end of the transmission
+    sock.sendto(b'', address)
+
 class MyUDPHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
         global BOB_DIGITAL_CERTIFICATE
         global ALICE_DIGITAL_CERTIFICATE
+        global BOB_CIPHER_RSA
+        global BOB_PUBLIC_KEY
+   
         encrypted_data = self.request[0].strip()
         socket = self.request[1]
         if b"get_certificate_from_alice " in encrypted_data:
-            # print("{} wrote: {}".format(self.client_address[0], encrypted_data))
             len_data = len("get_certificate_from_alice ")
             data = encrypted_data[len_data:]
             BOB_DIGITAL_CERTIFICATE = pickle.loads(data)
+            if not check_valid_certificate(BOB_DIGITAL_CERTIFICATE):
+                print("Invalid certificate")
+                exit(0)
+            BOB_PUBLIC_KEY = BOB_DIGITAL_CERTIFICATE.certificate_body.subject_public_key
+            BOB_CIPHER_RSA = PKCS1_OAEP.new(RSA.import_key(BOB_PUBLIC_KEY))
+            
             temp_a_cert = pickle.dumps(ALICE_DIGITAL_CERTIFICATE)
-            socket.sendto(temp_a_cert, self.client_address)
+            send_large_data(temp_a_cert, socket, self.client_address)
+            # socket.sendto(temp_a_cert, self.client_address)
         else:
             data = ALICE_DECIPHER_RSA.decrypt(encrypted_data)
             # data = encrypted_data
@@ -62,14 +81,22 @@ def recvall(sock):
     return data
 
 def check_valid_certificate(ds):
-    body = ds.certificate_body
-    data = pickle.dumps(body)
-    hash = hashlib.sha256(data).digest()
-    val_bytes = bytearray(hash)
-    temp = ''.join(['%02x' % byte for byte in val_bytes])
-    res = SERVER_DECIPHER_RSA.decrypt(ds.certificate_signature)
-    temp = temp.encode()
-    return temp == res
+    if PQ_FLAG: 
+        body = ds.certificate_body
+        data = pickle.dumps(body)
+        val_bytes = bytearray(data)
+        temp = ''.join(['%02x' % byte for byte in val_bytes])
+        res = Dilithium5.verify(SERVER_DILITHIUM_PUBLIC_KEY,str.encode(temp), ds.certificate_signature)
+        return res
+    else:
+        body = ds.certificate_body
+        data = pickle.dumps(body)
+        hash = hashlib.sha256(data).digest()
+        val_bytes = bytearray(hash)
+        temp = ''.join(['%02x' % byte for byte in val_bytes])
+        res = SERVER_DECIPHER_RSA.decrypt(ds.certificate_signature)
+        temp = temp.encode()
+        return temp == res
 
 def get_bob_public_key():
     message = b"get_certificate_bob"
@@ -87,8 +114,6 @@ def get_bob_public_key():
 def get_message():
     global BOB_PUBLIC_KEY
     global BOB_CIPHER_RSA
-    BOB_PUBLIC_KEY = get_bob_public_key()
-    BOB_CIPHER_RSA = PKCS1_OAEP.new(BOB_PUBLIC_KEY)
     
     with socketserver.UDPServer((HOST, ALICE_PORT), MyUDPHandler) as server:
         server.serve_forever()

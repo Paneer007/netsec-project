@@ -34,7 +34,7 @@ class DigitalCertificate:
     certificate_signature = None
     certificate_algorithm = None
     
-    def __init__(self,body, ) -> None:
+    def __init__(self,body) -> None:
         self.certificate_body=body
         data = pickle.dumps(body)
         hash = hashlib.sha256(data).digest()
@@ -49,12 +49,12 @@ class PQ_DigitalCertificate:
     certificate_signature = None
     certificate_algorithm = None
     
-    def __init__(self,body, ) -> None:
+    def __init__(self,body) -> None:
         self.certificate_body=body
         data = pickle.dumps(body)
-        hash = hashlib.sha256(data).digest()
-        val_bytes = bytearray(hash)
+        # hash = hashlib.sha256(data).digest()
+        val_bytes = bytearray(data)
         temp = ''.join(['%02x' % byte for byte in val_bytes])
-        self.certificate_algorithm = Dilithium5.sign(SERVER_DILITHIUM_PRIVATE_KEY, str.encode(temp))
+        self.certificate_signature= Dilithium5.sign(SERVER_DILITHIUM_PRIVATE_KEY, str.encode(temp))
         self.certificate_algorithm = "DILITHIUM"
  

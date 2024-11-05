@@ -4,7 +4,8 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import hashlib
 import pickle
-import sys
+from dylithium_py.src.dilithium_py.dilithium import Dilithium5
+
 
 HOST, PORT = "localhost", 9998
 ALICE_PORT =  9995
@@ -27,6 +28,8 @@ ALICE_CIPHER_RSA = None
 BOB_DIGITAL_CERTIFICATE = None
 ALICE_DIGITAL_CERTIFICATE = None
 
+PQ_FLAG = True
+
 def recvall(sock):
     BUFF_SIZE = 4096 # 4 KiB
     data = b''
@@ -38,14 +41,22 @@ def recvall(sock):
     return data
 
 def check_valid_certificate(ds):
-    body = ds.certificate_body
-    data = pickle.dumps(body)
-    hash = hashlib.sha256(data).digest()
-    val_bytes = bytearray(hash)
-    temp = ''.join(['%02x' % byte for byte in val_bytes])
-    res = SERVER_DECIPHER_RSA.decrypt(ds.certificate_signature)
-    temp = temp.encode()
-    return temp == res
+    if PQ_FLAG: 
+        body = ds.certificate_body
+        data = pickle.dumps(body)
+        val_bytes = bytearray(data)
+        temp = ''.join(['%02x' % byte for byte in val_bytes])
+        res = Dilithium5.verify(SERVER_DILITHIUM_PUBLIC_KEY,str.encode(temp), ds.certificate_signature)
+        return res
+    else:
+        body = ds.certificate_body
+        data = pickle.dumps(body)
+        hash = hashlib.sha256(data).digest()
+        val_bytes = bytearray(hash)
+        temp = ''.join(['%02x' % byte for byte in val_bytes])
+        res = SERVER_DECIPHER_RSA.decrypt(ds.certificate_signature)
+        temp = temp.encode()
+        return temp == res
 
 def get_alice_public_key():
     message = b"get_certificate_alice"
@@ -74,8 +85,6 @@ def get_alice_public_key_from_alice(sock):
 def send_message():
     global ALICE_PUBLIC_KEY
     global ALICE_CIPHER_RSA
-    # ALICE_PUBLIC_KEY = get_alice_public_key()
-    # ALICE_CIPHER_RSA = PKCS1_OAEP.new(ALICE_PUBLIC_KEY)
     i = 0
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.connect((HOST, ALICE_PORT))
@@ -85,9 +94,12 @@ def send_message():
             usr_data = input("> ")
             data = ALICE_CIPHER_RSA.encrypt(usr_data.encode())
             s.sendall(data)
-            data = s.recv(1024)
+            data = recvall(s)
+            if data == b'':
+                data = recvall(s)
+                data = BOB_DECIPHER_RSA.decrypt(data)
+                continue
             data = BOB_DECIPHER_RSA.decrypt(data)
-            print(data)
             i = i+1
 
 def cli_loop():
