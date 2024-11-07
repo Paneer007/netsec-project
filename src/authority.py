@@ -19,7 +19,6 @@ def send_large_data(data, sock,address, chunk_size=4096):
     # Send an empty chunk to indicate the end of the transmission
     sock.sendto(b'', address)
 
-"create_certificate_new <name> <RSA-key> "
 
 class MyUDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
@@ -59,7 +58,14 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
             socket.sendto(pickle.dumps(ds_dict["ALICE"]),self.client_address)
         elif b"get_certificate_bob" in data:
             socket.sendto(pickle.dumps(ds_dict["BOB"]),self.client_address)
-            
+        elif b"create_hierarchy_certificate" in data:
+            pass    
+
+def run_server(port):
+    HOST = "localhost"
+    print(f"Certificate Server running on host: {HOST} and port: {port} ")
+    with socketserver.UDPServer((HOST, port), MyUDPHandler) as server:
+        server.serve_forever()
 
 
 if __name__ == "__main__":
