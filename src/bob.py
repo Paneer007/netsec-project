@@ -98,8 +98,10 @@ def send_message():
             if data == b'':
                 data = recvall(s)
                 data = BOB_DECIPHER_RSA.decrypt(data)
+                print(data)
                 continue
             data = BOB_DECIPHER_RSA.decrypt(data)
+            print(data)
             i = i+1
 
 def cli_loop():
