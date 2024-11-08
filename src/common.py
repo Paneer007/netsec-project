@@ -2,6 +2,19 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import pickle 
 
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+
+engine = create_engine('mysql+mysqlconnector://root:password@localhost/netsec')
+Session = sessionmaker(bind=engine)
+session = Session()
+
+
+def get_sql_session():
+    global session
+    return session
+
+
 SERVER_PRIVATE_KEY = None
 SERVER_PUBLIC_KEY = None
 SERVER_DILITHIUM_PRIVATE_KEY = None
@@ -73,7 +86,7 @@ parent = {
     8008:8003,
 }
 
-INIT_FLAG = True
+INIT_FLAG = False
 
 if INIT_FLAG:
     # TODO get public keys

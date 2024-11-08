@@ -5,7 +5,6 @@ from Crypto.Cipher import PKCS1_OAEP
 import hashlib
 import pickle
 import socketserver
-import sys
 from dylithium_py.src.dilithium_py.dilithium import Dilithium5
 from certificate import PQ_DigitalCertificate
 
@@ -59,7 +58,6 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
                 exit(0)
             BOB_PUBLIC_KEY = BOB_DIGITAL_CERTIFICATE.certificate_body.subject_public_key
             BOB_CIPHER_RSA = PKCS1_OAEP.new(RSA.import_key(BOB_PUBLIC_KEY))
-            
             temp_a_cert = pickle.dumps(ALICE_DIGITAL_CERTIFICATE)
             send_large_data(temp_a_cert, socket, self.client_address)
             # socket.sendto(temp_a_cert, self.client_address)

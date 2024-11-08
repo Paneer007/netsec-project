@@ -4,9 +4,14 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from certificate import *
 import pickle
+import secrets
+import string
 
-import uuid
+def generate_alphanumeric_uuid(length=12):
+    characters = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(characters) for _ in range(length))
 
+uuid_string = generate_alphanumeric_uuid()
 ds_dict = {}
 
 PQ_FLAG = True
@@ -19,6 +24,66 @@ def send_large_data(data, sock,address, chunk_size=4096):
     # Send an empty chunk to indicate the end of the transmission
     sock.sendto(b'', address)
 
+def generatePath():
+    uuid = generate_alphanumeric_uuid()
+    return f"./certificates/users/{uuid}.pem"
+
+def writeDigitalCertificate(pq_dcert, path):
+     with open(path, "wb+") as f:
+        pickle.dump(pq_dcert, f)
+
+def insertEntryToSQL(name, path):
+    session = get_sql_session()
+    sql_string = f"INSERT INTO certificates VALUES( \"{name}\", \"{path}\") ; "
+    print(sql_string)
+    session.execute(text(sql_string))
+    session.commit()
+    
+def getEntryFromCAList(name):
+    session = get_sql_session()
+    sql_string = f"SELECT * FROM certificates where name = \"{name}\" LIMIT 1"
+    rows = session.execute(text(sql_string))
+    res = rows.fetchall()
+    if(len(res) == 0 ):
+        return None
+    if(len(res) > 1):
+        return None
+    return res[0]
+
+def addCRL(row):
+    session = get_sql_session()
+    sql_string = f"INSERT INTO crl_list VALUES(\"{row[0]}\", \"{row[1]}\");"
+    session.execute(text(sql_string))
+    session.commit()
+    
+def getCRLCount(name):
+    session = get_sql_session()
+    sql_string = f"SELECT * FROM crl_list WHERE name = \"{name}\""
+    rows = session.execute(text(sql_string))
+    res = rows.fetchall()
+    if len(res) > 0:
+        sql_string_delete = f"DELETE FROM crl_list WHERE name = \"{name}\""
+        rows = session.execute(text(sql_string_delete))
+        sql_string_delete = f"DELETE FROM certificates WHERE name = \"{name}\""
+        rows = session.execute(text(sql_string_delete))
+        session.commit()
+        return True
+    else:
+        return False
+
+def getCertificate(name):
+    session = get_sql_session()
+    sql_string = f"SELECT * FROM certificates where name = \"{name}\" LIMIT 1"
+    rows = session.execute(text(sql_string))
+    res = rows.fetchall()
+    if len(res) == 0:
+        return False
+    else:
+        res = res[0]
+        path = res[1]
+        with open(f"{path}", "rb") as f:
+            data_res = pickle.load(f)
+            return data_res
 
 class MyUDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
@@ -63,60 +128,56 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
             lindex = data.find(b'<')
             rindex = data.find(b'>')
             name = data[lindex+1 : rindex].decode("utf-8")
+            path = generatePath()
             USER_PUBLIC_KEY = RSA.import_key(data[rindex + 2:])
             certificate_user = Certificate(name,USER_PUBLIC_KEY.export_key())
             ds = PQ_DigitalCertificate(certificate_user)
-            ds_dict[name] = ds
-
+            writeDigitalCertificate(ds, path)
+            insertEntryToSQL(name, path )
+            # ds_dict[name] = ds
             cert_id = str(certificate_user.serial_no)
-
-            with open("D:\\Netseproject\\netsec-project\src\certificates\CAL_CRL_certs\CAlist.txt", "a") as file:
+            with open("./certificates/CAL_CRL_certs/CAlist.txt", "a") as file:
                 file.write(cert_id + "\n")
-
             socket.sendto(b"Created certificate successfully", self.client_address)
 
         elif b"revoke_certificate_user" in data:
             lindex = data.find(b'<')
             rindex = data.find(b'>')
             name = data[lindex+1 : rindex].decode("utf-8")
+            
+            # verify with digital signature
+            
             try:
-               ds = ds_dict[name]
-            except KeyError:
-                print("Certificate doesnt exist in dict")
+               row = getEntryFromCAList(name)
+               if row == None:
                 send_large_data(pickle.dumps(b"error 102"), socket, self.client_address)
-            else:
-                cert_id = str(ds.certificate_body.serial_no)
-
-                with open("D:\\Netseproject\\netsec-project\src\certificates\CAL_CRL_certs\CRL.txt", "a") as file:
-                    file.write(cert_id + "\n")
-
-                socket.sendto(b"Certificate revoked sucessfully", self.client_address)
-
+                return
+               addCRL(row)
+               socket.sendto(b"Certificate revoked sucessfully", self.client_address)
+               return
+               
+            except:
+                print("Internal server error")
+                send_large_data(pickle.dumps(b"error 102"), socket, self.client_address)
+             
         elif b"fetch_certificate_user" in data:
             lindex = data.find(b'<')
             rindex = data.find(b'>')
             name = data[lindex+1 : rindex].decode("utf-8")
             try:
-               ds = ds_dict[name]
-            except KeyError:
-                print("Certificate doesnt exist in dict")
-                send_large_data(pickle.dumps(b"error 102"), socket, self.client_address)
-            else:    
-                cert_id = str(ds.certificate_body.serial_no)
-
-                with open("D:\\Netseproject\\netsec-project\src\certificates\CAL_CRL_certs\CRL.txt", "r") as file:
-                    ids = {line.strip() for line in file}
-
-                if cert_id in ids:
+               if getCRLCount(name):
+                    send_large_data(pickle.dumps(b"error 102"), socket, self.client_address)
+                    return
+               res = getCertificate(name)
+               if res == False:
                     send_large_data(pickle.dumps(b"error 101"), socket, self.client_address)
-                else:
-                    with open("D:\\Netseproject\\netsec-project\src\certificates\CAL_CRL_certs\CAlist.txt", "r") as file:
-                        cert_ids = {line.strip() for line in file}
-
-                    if cert_id in cert_ids:
-                        send_large_data(pickle.dumps(ds_dict[name]), socket, self.client_address)
-                    else:
-                        send_large_data(pickle.dumps(b"error 102"), socket, self.client_address)
+                    return
+                    
+               send_large_data(pickle.dumps(res), socket, self.client_address)
+               
+            except:
+                print("Internal server error")
+                send_large_data(pickle.dumps(b"error 102"), socket, self.client_address)
         
 
 def run_server(port):
