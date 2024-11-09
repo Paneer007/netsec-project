@@ -9,7 +9,7 @@ import string
 from user import get_public_key_from_dict
 from Crypto.Signature import pkcs1_15
 from Crypto.Hash import SHA256
-
+import gzip
 
 def generate_alphanumeric_uuid(length=12):
     characters = string.ascii_letters + string.digits
@@ -30,16 +30,17 @@ def send_large_data(data, sock,address, chunk_size=4096):
 
 def generatePath():
     uuid = generate_alphanumeric_uuid()
-    return f"./certificates/users/{uuid}.pem"
+    return f"./certificates/users/{uuid}.pem.gz"
 
 def writeDigitalCertificate(pq_dcert, path):
-     with open(path, "wb+") as f:
+    with gzip.open(path, "wb+") as f:
         pickle.dump(pq_dcert, f)
+        
+        
 
 def insertEntryToSQL(name, path):
     session = get_sql_session()
     sql_string = f"INSERT INTO certificates VALUES( \"{name}\", \"{path}\") ; "
-    print(sql_string)
     session.execute(text(sql_string))
     session.commit()
     
@@ -85,7 +86,7 @@ def getCertificate(name):
     else:
         res = res[0]
         path = res[1]
-        with open(f"{path}", "rb") as f:
+        with gzip.open(f"{path}", "rb") as f:
             data_res = pickle.load(f)
             return data_res
 
@@ -149,23 +150,16 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
             name = data[lindex+1 : rindex].decode("utf-8")
             
             signature_name = data[rindex + 1:]
-            print(signature_name)
             
-            # verify with digital signature
-                        
-            # try:
             row = getEntryFromCAList(name)
             if row == None:
                 send_large_data(pickle.dumps(b"error 102"), socket, self.client_address)
                 return
             cert : PQ_DigitalCertificate = getCertificate(row[0])
-            print(RSA.import_key(cert.certificate_body.subject_public_key))
-            print(cert.certificate_body.subject_public_key)
-            print()
             # DECIPHER_RSA = PKCS1_OAEP.new(get_public_key_from_dict(name.encode()))
             verify_res = pkcs1_15.new(RSA.import_key(cert.certificate_body.subject_public_key))
             try:
-                d_name = verify_res.verify(SHA256.new(name.encode()),signature_name)
+                verify_res.verify(SHA256.new(name.encode()),signature_name)
             except:
                 socket.sendto(b"Invalid message", self.client_address)
                 return

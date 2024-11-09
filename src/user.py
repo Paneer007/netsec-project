@@ -169,6 +169,7 @@ def fetch_certificate():
         if type(msg_received) == PQ_DigitalCertificate:
             print("Certificate fetched successfully")
             USER_CERTIFICATE = msg_received
+            print(USER_CERTIFICATE)
             return
         if b"error 101" in msg_received:
             print("Error: Certificate revoked")
