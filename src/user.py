@@ -7,6 +7,9 @@ import pickle
 import socketserver
 from dylithium_py.src.dilithium_py.dilithium import Dilithium5
 from certificate import PQ_DigitalCertificate
+from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA256
+
 
 HOST, PORT = "localhost", 9998
 ALICE_PORT = 9995
@@ -30,6 +33,8 @@ BOB_DIGITAL_CERTIFICATE = None
 ALICE_DIGITAL_CERTIFICATE = None
 
 PQ_FLAG = True
+
+priv_key_dict = {}
 
 def send_large_data(data, sock,address, chunk_size=4096):
     # Split data into chunks
@@ -119,29 +124,40 @@ def get_message():
 
 
 def create_certificate():
+    
+    global public_key_dict
+    global priv_key_dict
+    
     name = input("Enter name: ").encode()
     PRIVATE_KEY = RSA.generate(1024)
     PUBLIC_KEY = PRIVATE_KEY.publickey()
-    message = b"create_certificate_user <" + name + b"> " + PUBLIC_KEY.export_key("OpenSSH")
+    set_public_key_from_dict(name,PUBLIC_KEY)
+    priv_key_dict[name] = PRIVATE_KEY
+    
+    message = b"create_certificate_user <" + name + b"> " + PUBLIC_KEY.export_key()
     data = SERVER_CIPHER_RSA.encrypt(message)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.connect((HOST, PORT))
         sock.sendall(data)
         received = recvall(sock)
-        print(received)
 
 def revoke_certificate():
+    global public_key_dict
+    global priv_key_dict
     name = input("Enter name: ").encode()
-    message = b"revoke_certificate_user <" + name + b">"
+    res = pkcs1_15.new(priv_key_dict[name])
+    t_name = res.sign(SHA256.new(name))
+    message = b"revoke_certificate_user <" + name + b">"+t_name
     data = SERVER_CIPHER_RSA.encrypt(message)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.connect((HOST, PORT))
         sock.sendall(data)
         received = recvall(sock)
-        print(received)
 
 
 def fetch_certificate():
+    global public_key_dict
+    global priv_key_dict
     name = input("Enter name: ").encode()
     message = b"fetch_certificate_user <" + name + b">"
     data = SERVER_CIPHER_RSA.encrypt(message)

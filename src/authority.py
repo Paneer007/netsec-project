@@ -6,6 +6,10 @@ from certificate import *
 import pickle
 import secrets
 import string
+from user import get_public_key_from_dict
+from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA256
+
 
 def generate_alphanumeric_uuid(length=12):
     characters = string.ascii_letters + string.digits
@@ -134,7 +138,6 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
             ds = PQ_DigitalCertificate(certificate_user)
             writeDigitalCertificate(ds, path)
             insertEntryToSQL(name, path )
-            # ds_dict[name] = ds
             cert_id = str(certificate_user.serial_no)
             with open("./certificates/CAL_CRL_certs/CAlist.txt", "a") as file:
                 file.write(cert_id + "\n")
@@ -145,20 +148,30 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
             rindex = data.find(b'>')
             name = data[lindex+1 : rindex].decode("utf-8")
             
-            # verify with digital signature
+            signature_name = data[rindex + 1:]
+            print(signature_name)
             
-            try:
-               row = getEntryFromCAList(name)
-               if row == None:
+            # verify with digital signature
+                        
+            # try:
+            row = getEntryFromCAList(name)
+            if row == None:
                 send_large_data(pickle.dumps(b"error 102"), socket, self.client_address)
                 return
-               addCRL(row)
-               socket.sendto(b"Certificate revoked sucessfully", self.client_address)
-               return
-               
+            cert : PQ_DigitalCertificate = getCertificate(row[0])
+            print(RSA.import_key(cert.certificate_body.subject_public_key))
+            print(cert.certificate_body.subject_public_key)
+            print()
+            # DECIPHER_RSA = PKCS1_OAEP.new(get_public_key_from_dict(name.encode()))
+            verify_res = pkcs1_15.new(RSA.import_key(cert.certificate_body.subject_public_key))
+            try:
+                d_name = verify_res.verify(SHA256.new(name.encode()),signature_name)
             except:
-                print("Internal server error")
-                send_large_data(pickle.dumps(b"error 102"), socket, self.client_address)
+                socket.sendto(b"Invalid message", self.client_address)
+                return
+            addCRL(row)
+            socket.sendto(b"Certificate revoked sucessfully", self.client_address)
+            return
              
         elif b"fetch_certificate_user" in data:
             lindex = data.find(b'<')
