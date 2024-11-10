@@ -18,7 +18,7 @@ def generate_alphanumeric_uuid(length=12):
 uuid_string = generate_alphanumeric_uuid()
 ds_dict = {}
 
-PQ_FLAG = True
+PQ_FLAG = False
 
 def send_large_data(data, sock,address, chunk_size=4096):
     # Split data into chunks
@@ -148,9 +148,7 @@ class MyUDPHandler(socketserver.BaseRequestHandler):
             lindex = data.find(b'<')
             rindex = data.find(b'>')
             name = data[lindex+1 : rindex].decode("utf-8")
-            
             signature_name = data[rindex + 1:]
-            
             row = getEntryFromCAList(name)
             if row == None:
                 send_large_data(pickle.dumps(b"error 102"), socket, self.client_address)

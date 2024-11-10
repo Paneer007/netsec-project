@@ -7,6 +7,7 @@ import pickle
 import socketserver
 import sys
 from dylithium_py.src.dilithium_py.dilithium import Dilithium5
+from Crypto.Hash import SHA256
 
 HOST, PORT = "localhost", 9998
 ALICE_PORT = 9995
@@ -29,7 +30,7 @@ BOB_CIPHER_RSA = None
 BOB_DIGITAL_CERTIFICATE = None
 ALICE_DIGITAL_CERTIFICATE = None
 
-PQ_FLAG = True
+PQ_FLAG = False
 
 def send_large_data(data, sock,address, chunk_size=4096):
     # Split data into chunks
@@ -91,12 +92,13 @@ def check_valid_certificate(ds):
     else:
         body = ds.certificate_body
         data = pickle.dumps(body)
-        hash = hashlib.sha256(data).digest()
-        val_bytes = bytearray(hash)
-        temp = ''.join(['%02x' % byte for byte in val_bytes])
-        res = SERVER_DECIPHER_RSA.decrypt(ds.certificate_signature)
-        temp = temp.encode()
-        return temp == res
+        hash = SHA256.new(data)
+        try:
+            SERVER_SIG_VERIFIER.verify(hash,ds.certificate_signature)
+        except Exception as err:
+            print(err)
+            return False
+        return True
 
 def get_bob_public_key():
     message = b"get_certificate_bob"

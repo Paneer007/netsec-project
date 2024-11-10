@@ -4,6 +4,7 @@ from common import *
 import uuid
 from datetime import datetime, timedelta
 from dylithium_py.src.dilithium_py.dilithium import Dilithium5
+from Crypto.Hash import SHA256
 
 class Certificate:
     version_no = None
@@ -42,10 +43,11 @@ class DigitalCertificate:
     def __init__(self,body) -> None:
         self.certificate_body=body
         data = pickle.dumps(body)
-        hash = hashlib.sha256(data).digest()
-        val_bytes = bytearray(hash)
-        temp = ''.join(['%02x' % byte for byte in val_bytes])
-        self.certificate_signature = SERVER_CIPHER_RSA.encrypt(str.encode(temp))
+        # hash = hashlib.sha256(data).digest()
+        # val_bytes = bytearray(hash)
+        # temp = ''.join(['%02x' % byte for byte in val_bytes])
+        hash = SHA256.new(data)
+        self.certificate_signature = SERVER_SIG_SIGNER.sign(hash)
         self.certificate_algorithm = "SHA+RSA"
 
     

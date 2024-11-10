@@ -4,6 +4,7 @@ import pickle
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from Crypto.Signature import pkcs1_15
 
 engine = create_engine('mysql+mysqlconnector://root:password@localhost/netsec')
 Session = sessionmaker(bind=engine)
@@ -52,6 +53,8 @@ FORWARD_CERTIFICATES = {}
 REVERSE_CERTIFICATES = {}
 OWNED_CERTIFICATE = {}
 
+SERVER_SIG_SIGNER = pkcs1_15.new(SERVER_PRIVATE_KEY)
+SERVER_SIG_VERIFIER = pkcs1_15.new(SERVER_PUBLIC_KEY)
 
 # pair: {parent_port_number, child_port_number}
 # Tree Hierarchy structure

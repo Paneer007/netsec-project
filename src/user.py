@@ -95,12 +95,13 @@ def check_valid_certificate(ds):
     else:
         body = ds.certificate_body
         data = pickle.dumps(body)
-        hash = hashlib.sha256(data).digest()
-        val_bytes = bytearray(hash)
-        temp = ''.join(['%02x' % byte for byte in val_bytes])
-        res = SERVER_DECIPHER_RSA.decrypt(ds.certificate_signature)
-        temp = temp.encode()
-        return temp == res
+        hash = SHA256.new(data)
+        try:
+            SERVER_SIG_VERIFIER.verify(hash,ds.certificate_signature)
+        except Exception as err:
+            print(err)
+            return False
+        return True
 
 def get_bob_public_key():
     message = b"get_certificate_bob"

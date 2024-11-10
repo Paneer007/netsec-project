@@ -5,6 +5,7 @@ from Crypto.Cipher import PKCS1_OAEP
 import hashlib
 import pickle
 from dylithium_py.src.dilithium_py.dilithium import Dilithium5
+from Crypto.Hash import SHA256
 
 
 HOST, PORT = "localhost", 9998
@@ -28,7 +29,7 @@ ALICE_CIPHER_RSA = None
 BOB_DIGITAL_CERTIFICATE = None
 ALICE_DIGITAL_CERTIFICATE = None
 
-PQ_FLAG = True
+PQ_FLAG = False
 
 def recvall(sock):
     BUFF_SIZE = 4096 # 4 KiB
@@ -51,12 +52,12 @@ def check_valid_certificate(ds):
     else:
         body = ds.certificate_body
         data = pickle.dumps(body)
-        hash = hashlib.sha256(data).digest()
-        val_bytes = bytearray(hash)
-        temp = ''.join(['%02x' % byte for byte in val_bytes])
-        res = SERVER_DECIPHER_RSA.decrypt(ds.certificate_signature)
-        temp = temp.encode()
-        return temp == res
+        hash = SHA256.new(data)
+        try:
+            SERVER_SIG_VERIFIER.verify(hash,ds.certificate_signature)
+        except:
+            return False
+        return True
 
 def get_alice_public_key():
     message = b"get_certificate_alice"
