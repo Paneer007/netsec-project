@@ -93,16 +93,14 @@ public_key_dict = {}
 
 def get_public_key_from_dict(name):
     global public_key_dict
-    print(public_key_dict)
     return public_key_dict[name]
 
 def set_public_key_from_dict(name, value):
     global public_key_dict
     public_key_dict[name] = value
-    print(public_key_dict)
 
 
-INIT_FLAG = False
+INIT_FLAG = True
 
 if INIT_FLAG:
     # TODO get public keys

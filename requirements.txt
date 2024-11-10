@@ -4,3 +4,4 @@ xoflib
 networkx
 sqlachemy
 mysql-connector-python
+pygraphviz

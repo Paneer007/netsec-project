@@ -141,6 +141,7 @@ def create_certificate():
         sock.connect((HOST, PORT))
         sock.sendall(data)
         received = recvall(sock)
+        print(received)
 
 def revoke_certificate():
     global public_key_dict
@@ -154,6 +155,7 @@ def revoke_certificate():
         sock.connect((HOST, PORT))
         sock.sendall(data)
         received = recvall(sock)
+        print(received)
 
 
 def fetch_certificate():
@@ -184,6 +186,7 @@ def cli_loop():
         print("3- Fetch certificate")
         print("4- Exit")
         user_input = int(input("Enter Option: "))
+        print(user_input)
         if user_input == 1:
             create_certificate()
         if user_input == 2:
@@ -193,8 +196,6 @@ def cli_loop():
         elif user_input == 4:
             print("User exited")
             exit(0)
-        else:
-            print("Enter Valid Input")
 
 def cli():
     print("User logged in")

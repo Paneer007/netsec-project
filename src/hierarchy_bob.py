@@ -3,9 +3,11 @@ from certificate import *
 from dylithium_py.src.dilithium_py.dilithium import Dilithium5
 import networkx as nx 
 import matplotlib.pyplot as plt 
+from networkx.drawing.nx_agraph import graphviz_layout
+import pygraphviz
 
 ALICE_PORT = 8008
-BOB_PORT = 8004
+BOB_PORT = 8006
 
 ALICE_CERTIFICATE = OWNED_CERTIFICATE[ALICE_PORT]
 BOB_CERTIFICATE = OWNED_CERTIFICATE[BOB_PORT]
@@ -136,7 +138,7 @@ def _get_verify_leaf_node_forward_certificate(LCA_CERTIFICATE:PQ_DigitalCertific
 
 def _print_path():
     global final_edges
-    G = nx.Graph() 
+    G = nx.DiGraph() 
     # Generate tree
     for edge in edges:
         G.add_edge(edge[0], edge[1],color='r', weight=2)
@@ -144,7 +146,8 @@ def _print_path():
     for i in range(0, len(final_edges) -1):
         G.add_edge(final_edges[i], final_edges[i+1], color='b', weight=6)
         
-    pos = nx.circular_layout(G)
+    pos=graphviz_layout(G, prog='dot')
+
     tedge = G.edges()
     colors = [G[u][v]['color'] for u,v in tedge]
     weights = [G[u][v]['weight'] for u,v in tedge]
